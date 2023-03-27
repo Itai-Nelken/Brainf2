@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(sources
     src/main.c
+    src/Strings.c
 )
 
 add_executable(brainf ${sources})
