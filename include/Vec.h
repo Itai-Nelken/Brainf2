@@ -118,6 +118,9 @@ static inline void _vec_reverse(void *vec) {
 
 #define VEC_INITIAL_SIZE 8
 
+// Note: do NOT use const as 'type' or with this "type".
+#define Vec(type) type *
+
 #define VEC_NEW(type) ((type *)(_vec_make_header(sizeof(type), VEC_INITIAL_SIZE)->data))
 #define VEC_FREE(vec) (_vec_free_header(_vec_to_header((void *)vec)))
 
