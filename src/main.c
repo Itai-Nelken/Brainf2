@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <getopt.h>
 #include "Vec.h"
 #include "Strings.h"
 
@@ -165,12 +166,11 @@ void tapeFree(Tape *t) {
 }
 
 void execute(Vec(Op) program, Tape *tape) {
-    for(uint32_t i = 0; i < VEC_LENGTH(program); ++i) {
+    VEC_ITERATE(op, program) {
         //for(int i = 0; i < 5; ++i) {
         //    printf("[%u]", tape->data[i]);
         //}
         //putchar('\n');
-        Op *op = &program[i];
         switch(op->type) {
             case OP_INCREMENT:
                 ++*tape->ptr;
@@ -204,6 +204,41 @@ void execute(Vec(Op) program, Tape *tape) {
     }
 }
 
+void compile_to_c(FILE *out, Vec(Op) prog) {
+    VEC_ITERATE(op, prog) {
+        switch(op->type) {
+            case OP_INCREMENT:
+                fputs("++*ptr;\n", out);
+                break;
+            case OP_DECREMENT:
+                fputs("--*ptr;\n", out);
+                break;
+            case OP_FORWARD:
+                fputs("++ptr;\n", out);
+                break;
+            case OP_BACKWARD:
+                fputs("--ptr;\n", out);
+                break;
+            case OP_READ:
+                fputs("*ptr = getchar();\n", out);
+                break;
+            case OP_WRITE:
+                fputs("putchar(*ptr);\n", out);
+                break;
+            case OP_LOOP:
+                fputs("while(*ptr) {\n", out);
+                compile_to_c(out, op->as.loop_body);
+                fputs("}\n", out);
+                break;
+            default:
+                fprintf(stderr, "Error: unkown op:\n");
+                opPrint(stderr, *op); putchar('\n');
+                assert(0);
+                return;
+        }
+    }
+}
+
 static bool read_file(String *buffer, const char *path) {
     FILE *f = fopen(path, "r");
     if(!f) {
@@ -221,21 +256,42 @@ static bool read_file(String *buffer, const char *path) {
     return true;
 }
 
+static inline void usage(const char *argv0) {
+    fprintf(stderr, "Usage: %s [options]\n", argv0);
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "    [code]    execute code directly from the first argument.\n");
+    fprintf(stderr, "    -f [file] execute a file.\n");
+    fprintf(stderr, "    -c [file] compile a file to optimized C code.\n");
+}
+
 #define TAPE_SIZE 30000
 int main(int argc, char **argv) {
     if(argc < 2) {
-        fprintf(stderr, "Usage: %s [options]\n", argv[0]);
-        fprintf(stderr, "Options:\n");
-        fprintf(stderr, "    -f [file] execute a file\n");
-        fprintf(stderr, "    [code]    execute code directly from the first argument.\n");
+        fputs("Error: insufficient arguments.\n", stderr);
+        usage(argv[0]);
         return 1;
     }
-    String input;
-    if(argv[1][0] == '-' && argv[1][1] == 'f' && argv[1][2] == '\0') {
-        if(argc < 3) {
-            fprintf(stderr, "Error: expected a filename for option '-f'.\n");
-            return 1;
+    int opt;
+    char *opt_input_file = NULL;
+    bool opt_compile_to_c = false;
+    while((opt = getopt(argc, argv, "f:c:h")) != -1) {
+        switch(opt) {
+            case 'h':
+                usage(argv[0]);
+                return 1;
+            case 'f':
+                opt_input_file = optarg;
+                break;
+            case 'c':
+                opt_input_file = optarg;
+                opt_compile_to_c = true;
+                break;
+            default:
+                continue;
         }
+    }
+    String input;
+    if(opt_input_file) {
         input = stringNew(16); // 16 is just a random number.
         if(!read_file(&input, argv[2])) {
             fprintf(stderr, "Error: failed to read file '%s'!\n", argv[2]);
@@ -253,9 +309,22 @@ int main(int argc, char **argv) {
     //VEC_ITERATE(op, program) {
     //    opPrint(stdout, *op); putchar('\n');
     //}
-    Tape tape = tapeNew(TAPE_SIZE);
-    execute(program, &tape);
-    tapeFree(&tape);
+
+    if(opt_compile_to_c) {
+        FILE *out = fopen("brainf.out.c", "w");
+        assert(out);
+        fputs("#include <stdio.h>\n", out);
+        fputs("static char tape[30000] = {0};\n", out);
+        fputs("static char *ptr = tape;\n", out);
+        fputs("int main(void) {\n", out);
+        compile_to_c(out, program);
+        fputs("return 0;\n}\n", out);
+        assert(fclose(out) == 0);
+    } else {
+        Tape tape = tapeNew(TAPE_SIZE);
+        execute(program, &tape);
+        tapeFree(&tape);
+    }
     VEC_ITERATE(op, program) { opFree(op); }
     VEC_FREE(program);
     return 0;
