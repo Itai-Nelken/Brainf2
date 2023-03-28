@@ -203,13 +203,47 @@ void execute(Vec(Op) program, Tape *tape) {
     }
 }
 
+static bool read_file(String *buffer, const char *path) {
+    FILE *f = fopen(path, "r");
+    if(!f) {
+        return false;
+    }
+
+    char read_buffer[1024] = {0};
+    while(fgets(read_buffer, sizeof(read_buffer)/sizeof(read_buffer[0]), f) != NULL) {
+        stringAppend(buffer, "%s", read_buffer);
+    }
+
+    if(fclose(f) == EOF) {
+        return false;
+    }
+    return true;
+}
+
 #define TAPE_SIZE 30000
 int main(int argc, char **argv) {
     if(argc < 2) {
-        fprintf(stderr, "Usage: %s [code]\n", argv[0]);
+        fprintf(stderr, "Usage: %s [options]\n", argv[0]);
+        fprintf(stderr, "Options:\n");
+        fprintf(stderr, "    -f [file] execute a file\n");
+        fprintf(stderr, "    [code]    execute code directly from the first argument.\n");
         return 1;
     }
-    Compiler compiler = compilerNew(argv[1]);
+    String input;
+    if(argv[1][0] == '-' && argv[1][1] == 'f' && argv[1][2] == '\0') {
+        if(argc < 3) {
+            fprintf(stderr, "Error: expected a filename for option '-f'.\n");
+            return 1;
+        }
+        input = stringNew(16); // 16 is just a random number.
+        if(!read_file(&input, argv[2])) {
+            fprintf(stderr, "Error: failed to read file '%s'!\n", argv[2]);
+        }
+    } else {
+        input = stringCopy(argv[1]);
+    }
+    Compiler compiler = compilerNew(input);
+    stringFree(input);
     Vec(Op) program = compile(&compiler, false);
     compilerFree(&compiler);
     if(!program) {
