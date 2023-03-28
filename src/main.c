@@ -27,12 +27,12 @@ Op opNew(OpType type) {
     };
 }
 
-void opFree(Op op) {
-    if(op.type == OP_LOOP) {
-        VEC_ITERATE(op2, op.as.loop_body) {
-            opFree(*op2);
+void opFree(Op *op) {
+    if(op->type == OP_LOOP) {
+        VEC_ITERATE(op2, op->as.loop_body) {
+            opFree(op2);
         }
-        VEC_FREE(op.as.loop_body);
+        VEC_FREE(op->as.loop_body);
     }
 }
 
@@ -255,7 +255,7 @@ int main(int argc, char **argv) {
     Tape tape = tapeNew(TAPE_SIZE);
     execute(program, &tape);
     tapeFree(&tape);
-    VEC_ITERATE(op, program) { opFree(*op); }
+    VEC_ITERATE(op, program) { opFree(op); }
     VEC_FREE(program);
     return 0;
 }
