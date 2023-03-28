@@ -147,6 +147,7 @@ Tape tapeNew(uint32_t size) {
     Tape t;
     t.size = size;
     t.data = calloc(1, sizeof(*t.data));
+    assert(t.data);
     t.ptr = t.data;
     return t;
 }
