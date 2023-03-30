@@ -8,7 +8,7 @@
 typedef enum op_type {
     OP_INCREMENT, OP_INCREMENT_X,
     OP_DECREMENT, OP_DECREMENT_X,
-    OP_FORWARD,
+    OP_FORWARD, OP_FORWARD_X,
     OP_BACKWARD,
     OP_READ,
     OP_WRITE,
@@ -42,7 +42,7 @@ static const char *op_type_str(OpType op) {
     static const char *op_names[] = {
         "OP_INCREMENT", "OP_INCREMENT_X",
         "OP_DECREMENT", "OP_DECREMENT_X",
-        "OP_FORWARD", 
+        "OP_FORWARD", "OP_FORWARD_X",
         "OP_BACKWARD",
         "OP_READ",
         "OP_WRITE",
@@ -187,6 +187,7 @@ static bool is_x_op(OpType op_type) {
     switch(op_type) {
         case OP_INCREMENT_X:
         case OP_DECREMENT_X:
+        case OP_FORWARD_X:
             return true;
         default:
             break;
@@ -200,6 +201,8 @@ static OpType x_op_from_op(OpType op) {
             return OP_INCREMENT_X;
         case OP_DECREMENT:
             return OP_DECREMENT_X;
+        case OP_FORWARD:
+            return OP_FORWARD_X;
         default:
             break;
     }
@@ -212,6 +215,8 @@ static OpType remove_x_from_x_op(OpType x_op) {
             return OP_INCREMENT;
         case OP_DECREMENT_X:
             return OP_DECREMENT;
+        case OP_FORWARD_X:
+            return OP_FORWARD;
         default:
             break;
     }
@@ -223,6 +228,7 @@ static bool is_optimizable_op_pair(OpType a, OpType b) {
         switch(a) {
             case OP_INCREMENT:
             case OP_DECREMENT:
+            case OP_FORWARD:
                 return true;
             default:
                 return false;
@@ -362,14 +368,17 @@ void execute(Vec(Op) program, Tape *tape) {
             case OP_INCREMENT_X:
                 *tape->ptr += op->as.x;
                 break;
-            case OP_DECREMENT_X:
-                *tape->ptr -= op->as.x;
-                break;
             case OP_DECREMENT:
                 --*tape->ptr;
                 break;
+            case OP_DECREMENT_X:
+                *tape->ptr -= op->as.x;
+                break;
             case OP_FORWARD:
                 tapeMovePtr(tape, 1);
+                break;
+            case OP_FORWARD_X:
+                tapeMovePtr(tape, op->as.x);
                 break;
             case OP_BACKWARD:
                 tapeMovePtr(tape, -1);
@@ -403,14 +412,17 @@ void compile_to_c(FILE *out, Vec(Op) prog) {
             case OP_INCREMENT_X:
                 fprintf(out, "*ptr += %u;\n", op->as.x);
                 break;
-            case OP_DECREMENT_X:
-                fprintf(out, "*ptr -= %u;\n", op->as.x);
-                break;
             case OP_DECREMENT:
                 fputs("--*ptr;\n", out);
                 break;
+            case OP_DECREMENT_X:
+                fprintf(out, "*ptr -= %u;\n", op->as.x);
+                break;
             case OP_FORWARD:
                 fputs("++ptr;\n", out);
+                break;
+            case OP_FORWARD_X:
+                fprintf(out, "ptr += %u;\n", op->as.x);
                 break;
             case OP_BACKWARD:
                 fputs("--ptr;\n", out);
