@@ -481,11 +481,11 @@ int main(int argc, char **argv) {
     String input;
     if(opt_input_file) {
         input = stringNew(16); // 16 is just a random number.
-        if(!read_file(&input, argv[2])) {
-            fprintf(stderr, "Error: failed to read file '%s'!\n", argv[2]);
+        if(!read_file(&input, opt_input_file)) {
+            fprintf(stderr, "Error: failed to read file '%s'!\n", opt_input_file);
         }
     } else {
-        input = stringCopy(argv[1]);
+        input = stringCopy(argv[optind]);
     }
     Compiler compiler = compilerNew(input);
     stringFree(input);
