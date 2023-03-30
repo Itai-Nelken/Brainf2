@@ -8,6 +8,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(sources
     src/main.c
+    src/Compiler.c
+    src/Interpreter.c
+    src/Ops.c
+    src/Optimizer.c
     src/Strings.c
 )
 
