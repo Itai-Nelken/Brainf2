@@ -7,7 +7,7 @@
 
 typedef enum op_type {
     OP_INCREMENT, OP_INCREMENT_X,
-    OP_DECREMENT,
+    OP_DECREMENT, OP_DECREMENT_X,
     OP_FORWARD,
     OP_BACKWARD,
     OP_READ,
@@ -41,7 +41,7 @@ void opFree(Op *op) {
 static const char *op_type_str(OpType op) {
     static const char *op_names[] = {
         "OP_INCREMENT", "OP_INCREMENT_X",
-        "OP_DECREMENT",
+        "OP_DECREMENT", "OP_DECREMENT_X",
         "OP_FORWARD", 
         "OP_BACKWARD",
         "OP_READ",
@@ -186,6 +186,7 @@ static bool window_is_empty(Window window) {
 static bool is_x_op(OpType op_type) {
     switch(op_type) {
         case OP_INCREMENT_X:
+        case OP_DECREMENT_X:
             return true;
         default:
             break;
@@ -197,6 +198,8 @@ static OpType x_op_from_op(OpType op) {
     switch(op) {
         case OP_INCREMENT:
             return OP_INCREMENT_X;
+        case OP_DECREMENT:
+            return OP_DECREMENT_X;
         default:
             break;
     }
@@ -207,6 +210,8 @@ static OpType remove_x_from_x_op(OpType x_op) {
     switch(x_op) {
         case OP_INCREMENT_X:
             return OP_INCREMENT;
+        case OP_DECREMENT_X:
+            return OP_DECREMENT;
         default:
             break;
     }
@@ -217,6 +222,7 @@ static bool is_optimizable_op_pair(OpType a, OpType b) {
     if(a == b) {
         switch(a) {
             case OP_INCREMENT:
+            case OP_DECREMENT:
                 return true;
             default:
                 return false;
@@ -356,6 +362,9 @@ void execute(Vec(Op) program, Tape *tape) {
             case OP_INCREMENT_X:
                 *tape->ptr += op->as.x;
                 break;
+            case OP_DECREMENT_X:
+                *tape->ptr -= op->as.x;
+                break;
             case OP_DECREMENT:
                 --*tape->ptr;
                 break;
@@ -393,6 +402,9 @@ void compile_to_c(FILE *out, Vec(Op) prog) {
                 break;
             case OP_INCREMENT_X:
                 fprintf(out, "*ptr += %u;\n", op->as.x);
+                break;
+            case OP_DECREMENT_X:
+                fprintf(out, "*ptr -= %u;\n", op->as.x);
                 break;
             case OP_DECREMENT:
                 fputs("--*ptr;\n", out);
