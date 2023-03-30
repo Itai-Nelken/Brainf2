@@ -496,6 +496,7 @@ int main(int argc, char **argv) {
     char *opt_input_file = NULL;
     bool opt_compile_to_c = false;
     bool opt_optimize = false;
+    bool had_error = false;
     while((opt = getopt(argc, argv, "f:c:ho")) != -1) {
         switch(opt) {
             case 'h':
@@ -511,9 +512,15 @@ int main(int argc, char **argv) {
             case 'o':
                 opt_optimize = true;
                 break;
+            case '?':
+                had_error = true;
+                break;
             default:
-                continue;
+                UNREACHABLE();
         }
+    }
+    if(had_error) {
+        return 1;
     }
     String input;
     if(opt_input_file) {
