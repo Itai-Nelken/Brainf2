@@ -482,6 +482,7 @@ static inline void usage(const char *argv0) {
     fprintf(stderr, "    [code]    execute code directly from the first argument.\n");
     fprintf(stderr, "    -f [file] execute a file.\n");
     fprintf(stderr, "    -c [file] compile a file to C code.\n");
+    fprintf(stderr, "    -o        Optimize the program.\n");
 }
 
 #define TAPE_SIZE 30000
