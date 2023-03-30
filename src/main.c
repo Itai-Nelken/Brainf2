@@ -9,7 +9,7 @@ typedef enum op_type {
     OP_INCREMENT, OP_INCREMENT_X,
     OP_DECREMENT, OP_DECREMENT_X,
     OP_FORWARD, OP_FORWARD_X,
-    OP_BACKWARD,
+    OP_BACKWARD, OP_BACKWARD_X,
     OP_READ,
     OP_WRITE,
     OP_LOOP
@@ -43,7 +43,7 @@ static const char *op_type_str(OpType op) {
         "OP_INCREMENT", "OP_INCREMENT_X",
         "OP_DECREMENT", "OP_DECREMENT_X",
         "OP_FORWARD", "OP_FORWARD_X",
-        "OP_BACKWARD",
+        "OP_BACKWARD", "OP_BACKWARD_X",
         "OP_READ",
         "OP_WRITE",
         "OP_LOOP"
@@ -188,6 +188,7 @@ static bool is_x_op(OpType op_type) {
         case OP_INCREMENT_X:
         case OP_DECREMENT_X:
         case OP_FORWARD_X:
+        case OP_BACKWARD_X:
             return true;
         default:
             break;
@@ -203,6 +204,8 @@ static OpType x_op_from_op(OpType op) {
             return OP_DECREMENT_X;
         case OP_FORWARD:
             return OP_FORWARD_X;
+        case OP_BACKWARD:
+            return OP_BACKWARD_X;
         default:
             break;
     }
@@ -217,6 +220,8 @@ static OpType remove_x_from_x_op(OpType x_op) {
             return OP_DECREMENT;
         case OP_FORWARD_X:
             return OP_FORWARD;
+        case OP_BACKWARD_X:
+            return OP_BACKWARD;
         default:
             break;
     }
@@ -229,6 +234,7 @@ static bool is_optimizable_op_pair(OpType a, OpType b) {
             case OP_INCREMENT:
             case OP_DECREMENT:
             case OP_FORWARD:
+            case OP_BACKWARD:
                 return true;
             default:
                 return false;
@@ -383,6 +389,9 @@ void execute(Vec(Op) program, Tape *tape) {
             case OP_BACKWARD:
                 tapeMovePtr(tape, -1);
                 break;
+            case OP_BACKWARD_X:
+                tapeMovePtr(tape, -op->as.x);
+                break;
             case OP_READ:
                 *tape->ptr = getchar();
                 break;
@@ -426,6 +435,9 @@ void compile_to_c(FILE *out, Vec(Op) prog) {
                 break;
             case OP_BACKWARD:
                 fputs("--ptr;\n", out);
+                break;
+            case OP_BACKWARD_X:
+                fprintf(out, "ptr -= %u;\n", op->as.x);
                 break;
             case OP_READ:
                 fputs("*ptr = getchar();\n", out);
