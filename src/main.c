@@ -5,6 +5,8 @@
 #include "Vec.h"
 #include "Strings.h"
 
+#define UNREACHABLE() (fprintf(stderr, "\nUnreachable state!\n"), abort())
+
 typedef enum op_type {
     OP_INCREMENT, OP_INCREMENT_X,
     OP_DECREMENT, OP_DECREMENT_X,
@@ -209,7 +211,7 @@ static OpType x_op_from_op(OpType op) {
         default:
             break;
     }
-    assert(0 && "non-optimizable op provided to x_op_from_op()");
+    UNREACHABLE();
 }
 
 static OpType remove_x_from_x_op(OpType x_op) {
@@ -225,7 +227,7 @@ static OpType remove_x_from_x_op(OpType x_op) {
         default:
             break;
     }
-    assert(0 && "non-x op provided to remove_x_from_x_op()");
+    UNREACHABLE();
 }
 
 static bool is_optimizable_op_pair(OpType a, OpType b) {
@@ -257,7 +259,7 @@ static Op make_optimized_op(Op *a, Op *b) {
         op.as.x = a->as.x + 1;
         return op;
     }
-    assert(0 && "unreachable state");
+    UNREACHABLE();
 }
 
 struct optimized_op {
@@ -406,8 +408,7 @@ void execute(Vec(Op) program, Tape *tape) {
             default:
                 fprintf(stderr, "Error: unkown op:\n");
                 opPrint(stderr, *op);
-                assert(0);
-                return;
+                UNREACHABLE();
         }
     }
 }
@@ -453,8 +454,7 @@ void compile_to_c(FILE *out, Vec(Op) prog) {
             default:
                 fprintf(stderr, "Error: unkown op:\n");
                 opPrint(stderr, *op); putchar('\n');
-                assert(0);
-                return;
+                UNREACHABLE();
         }
     }
 }
