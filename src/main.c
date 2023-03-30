@@ -6,7 +6,7 @@
 #include "Strings.h"
 
 typedef enum op_type {
-    OP_INCREMENT,
+    OP_INCREMENT, OP_INCREMENT_X,
     OP_DECREMENT,
     OP_FORWARD,
     OP_BACKWARD,
@@ -19,6 +19,7 @@ typedef struct op {
     OpType type;
     union {
         Vec(struct op) loop_body;
+        uint32_t x;
     } as;
 } Op;
 
@@ -39,7 +40,7 @@ void opFree(Op *op) {
 
 static const char *op_type_str(OpType op) {
     static const char *op_names[] = {
-        "OP_INCREMENT",
+        "OP_INCREMENT", "OP_INCREMENT_X",
         "OP_DECREMENT",
         "OP_FORWARD", 
         "OP_BACKWARD",
@@ -50,6 +51,7 @@ static const char *op_type_str(OpType op) {
     return op_names[op];
 }
 
+static bool is_x_op(OpType);
 static void op_print_internal(FILE *to, Op op, uint8_t depth) {
     // depth * 2 so for each depth level, 2 spaces are printed.
     for(uint8_t i = 0; i < depth * 2; ++i) fputc(' ', to);
@@ -59,6 +61,8 @@ static void op_print_internal(FILE *to, Op op, uint8_t depth) {
             fputc('\n', to);
             op_print_internal(to, *op2, depth + 1);
         }
+    } else if(is_x_op(op.type)) {
+        fprintf(to, ", %u", op.as.x);
     }
 }
 
@@ -138,6 +142,180 @@ Vec(Op) compile(Compiler *c, bool in_loop) {
     return out;
 }
 
+typedef struct op_iterator {
+    Vec(Op) ops;
+    uint32_t idx;
+} OpIterator;
+
+static OpIterator opIteratorNew(Vec(Op) ops) {
+    return (OpIterator){
+        .ops = ops,
+        .idx = 0
+    };
+}
+
+static void opIteratorFree(OpIterator *iter) {
+    iter->ops = NULL;
+    iter->idx = 0;
+}
+
+static uint32_t opIteratorCurrentIdx(OpIterator *iter) {
+    return iter->idx - 1;
+}
+
+static Op *opIteratorNextOrNull(OpIterator *iter) {
+    if(iter->idx < VEC_LENGTH(iter->ops)) {
+        return &iter->ops[iter->idx++];
+    }
+    return NULL;
+}
+
+#define WINDOW_SIZE 2
+typedef Op *Window[WINDOW_SIZE];
+
+static void window_slide(Window window, OpIterator *iter) {
+    static_assert(WINDOW_SIZE == 2, "window_slide() expects WINDOW_SIZE to be 2");
+    window[0] = window[1];
+    window[1] = opIteratorNextOrNull(iter);
+}
+
+static bool window_is_empty(Window window) {
+    return window[0] == NULL && window[1] == NULL;
+}
+
+static bool is_x_op(OpType op_type) {
+    switch(op_type) {
+        case OP_INCREMENT_X:
+            return true;
+        default:
+            break;
+    }
+    return false;
+}
+
+static OpType x_op_from_op(OpType op) {
+    switch(op) {
+        case OP_INCREMENT:
+            return OP_INCREMENT_X;
+        default:
+            break;
+    }
+    assert(0 && "non-optimizable op provided to x_op_from_op()");
+}
+
+static OpType remove_x_from_x_op(OpType x_op) {
+    switch(x_op) {
+        case OP_INCREMENT_X:
+            return OP_INCREMENT;
+        default:
+            break;
+    }
+    assert(0 && "non-x op provided to remove_x_from_x_op()");
+}
+
+static bool is_optimizable_op_pair(OpType a, OpType b) {
+    if(a == b) {
+        switch(a) {
+            case OP_INCREMENT:
+                return true;
+            default:
+                return false;
+        }
+    } else if(is_x_op(a) && remove_x_from_x_op(a) == b) {
+        return true;
+    } else if(is_x_op(b) && remove_x_from_x_op(b) == a) {
+        return true;
+    }
+    return false;
+}
+
+static Op make_optimized_op(Op *a, Op *b) {
+    if(a->type == b->type) {
+        Op op = opNew(x_op_from_op(a->type));
+        op.as.x = 2;
+        return op;
+    } else if(is_x_op(a->type)) {
+        Op op = opNew(a->type);
+        op.as.x = a->as.x + 1;
+        return op;
+    }
+    assert(0 && "unreachable state");
+}
+
+struct optimized_op {
+    Op op;
+    uint32_t start, end;
+};
+
+static struct optimized_op *find_optimized_op(Vec(struct optimized_op) ops, uint32_t start_idx) {
+    VEC_ITERATE(op, ops) {
+        if(op->start == start_idx) {
+            return op;
+        }
+    }
+    return NULL;
+}
+
+// Note: ownership of [prog] is taken.
+Vec(Op) optimize(Vec(Op) prog) {
+    // Can't optimize less than 2 ops.
+    if(VEC_LENGTH(prog) < 2) {
+        return prog;
+    }
+
+    Window window = {NULL, NULL};
+    OpIterator iter = opIteratorNew(prog);
+
+    // fill the window (Note: assumes window length is 2)
+    window_slide(window, &iter);
+    window_slide(window, &iter);
+
+    Vec(struct optimized_op) optimized_ops = VEC_NEW(struct optimized_op);
+    while(!window_is_empty(window)) {
+        if(window[0] && window[1]) {
+            if(window[0]->type == OP_LOOP) {
+                window[0]->as.loop_body = optimize(window[0]->as.loop_body);
+            } else if(window[1]->type == OP_LOOP) {
+                window[1]->as.loop_body = optimize(window[1]->as.loop_body);
+            } else if(is_optimizable_op_pair(window[0]->type, window[1]->type)) {
+                struct optimized_op optimized_op = (struct optimized_op){
+                    .op = make_optimized_op(window[0], window[1]),
+                    .start = opIteratorCurrentIdx(&iter) - 1,
+                    .end = opIteratorCurrentIdx(&iter)
+                };
+                if(optimized_op.op.as.x > 2) {
+                    struct optimized_op prev = VEC_POP(optimized_ops);
+                    optimized_op.start = prev.start;
+                    optimized_op.end = opIteratorCurrentIdx(&iter);
+                }
+                VEC_PUSH(optimized_ops, optimized_op);
+                window[1] = &optimized_op.op;
+            }
+        }
+        window_slide(window, &iter);
+    }
+    opIteratorFree(&iter);
+
+    //VEC_ITERATE(op, optimized_ops) {
+    //    printf(">%u:%u - ", op->start, op->end); opPrint(stdout, op->op); putchar('\n');
+    //}
+
+    Vec(Op) out = VEC_NEW(Op);
+    VEC_FOREACH(i, prog) {
+        struct optimized_op *optimized_op = find_optimized_op(optimized_ops, i);
+        if(optimized_op != NULL) {
+            VEC_PUSH(out, optimized_op->op);
+            i += optimized_op->end - optimized_op->start;
+        } else {
+            VEC_PUSH(out, prog[i]);
+        }
+    }
+
+    VEC_FREE(optimized_ops);
+    VEC_FREE(prog);
+    return out;
+}
+
 typedef struct tape {
     uint32_t size;
     char *data;
@@ -175,6 +353,9 @@ void execute(Vec(Op) program, Tape *tape) {
             case OP_INCREMENT:
                 ++*tape->ptr;
                 break;
+            case OP_INCREMENT_X:
+                *tape->ptr += op->as.x;
+                break;
             case OP_DECREMENT:
                 --*tape->ptr;
                 break;
@@ -209,6 +390,9 @@ void compile_to_c(FILE *out, Vec(Op) prog) {
         switch(op->type) {
             case OP_INCREMENT:
                 fputs("++*ptr;\n", out);
+                break;
+            case OP_INCREMENT_X:
+                fprintf(out, "*ptr += %u;\n", op->as.x);
                 break;
             case OP_DECREMENT:
                 fputs("--*ptr;\n", out);
@@ -261,7 +445,7 @@ static inline void usage(const char *argv0) {
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "    [code]    execute code directly from the first argument.\n");
     fprintf(stderr, "    -f [file] execute a file.\n");
-    fprintf(stderr, "    -c [file] compile a file to optimized C code.\n");
+    fprintf(stderr, "    -c [file] compile a file to C code.\n");
 }
 
 #define TAPE_SIZE 30000
@@ -274,7 +458,8 @@ int main(int argc, char **argv) {
     int opt;
     char *opt_input_file = NULL;
     bool opt_compile_to_c = false;
-    while((opt = getopt(argc, argv, "f:c:h")) != -1) {
+    bool opt_optimize = false;
+    while((opt = getopt(argc, argv, "f:c:ho")) != -1) {
         switch(opt) {
             case 'h':
                 usage(argv[0]);
@@ -285,6 +470,9 @@ int main(int argc, char **argv) {
             case 'c':
                 opt_input_file = optarg;
                 opt_compile_to_c = true;
+                break;
+            case 'o':
+                opt_optimize = true;
                 break;
             default:
                 continue;
@@ -306,10 +494,12 @@ int main(int argc, char **argv) {
     if(!program) {
         return 1;
     }
+    if(opt_optimize) {
+        program = optimize(program);
+    }
     //VEC_ITERATE(op, program) {
     //    opPrint(stdout, *op); putchar('\n');
     //}
-
     if(opt_compile_to_c) {
         FILE *out = fopen("brainf.out.c", "w");
         assert(out);
