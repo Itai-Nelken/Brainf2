@@ -75,16 +75,18 @@ static bool read_file(String *buffer, const char *path) {
 static inline void usage(const char *argv0) {
     fprintf(stderr, "Usage: %s [options]\n", argv0);
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    [code]    execute code directly from the first argument.\n");
-    fprintf(stderr, "    -f [file] execute a file.\n");
-    fprintf(stderr, "    -c [file] compile a file to C code.\n");
+    fprintf(stderr, "    [code]    Execute code directly from the first argument.\n");
+    fprintf(stderr, "    -f [file] Execute a file.\n");
+    fprintf(stderr, "    -c [file] Compile a file to C code.\n");
     fprintf(stderr, "    -o        Optimize the program.\n");
+    fprintf(stderr, "    -d        Dump the compiled (and optimized if '-o' set) instructions.\n");
 }
 
 typedef struct options {
     char *input_file;
     bool compile_to_c;
     bool optimize;
+    bool dump_instructions;
 } Options;
 
 static bool parse_arguments(Options *opts, int argc, char **argv) {
@@ -96,11 +98,11 @@ static bool parse_arguments(Options *opts, int argc, char **argv) {
 
     int opt;
     bool had_error = false;
-    while((opt = getopt(argc, argv, "f:c:ho")) != -1) {
+    while((opt = getopt(argc, argv, "f:c:hod")) != -1) {
         switch(opt) {
             case 'h':
                 usage(argv[0]);
-                return 1;
+                return false;
             case 'f':
                 opts->input_file = optarg;
                 break;
@@ -110,6 +112,9 @@ static bool parse_arguments(Options *opts, int argc, char **argv) {
                 break;
             case 'o':
                 opts->optimize = true;
+                break;
+            case 'd':
+                opts->dump_instructions = true;
                 break;
             case '?':
                 had_error = true;
@@ -131,7 +136,8 @@ int main(int argc, char **argv) {
     Options opts = {
         .input_file = NULL,
         .compile_to_c = false,
-        .optimize = false
+        .optimize = false,
+        .dump_instructions = false
     };
     if(!parse_arguments(&opts, argc, argv)) {
         return 1;
@@ -157,9 +163,12 @@ int main(int argc, char **argv) {
     if(opts.optimize) {
         program = optimize(program);
     }
-    //VEC_ITERATE(op, program) {
-    //    opPrint(stdout, *op); putchar('\n');
-    //}
+    if(opts.dump_instructions) {
+        VEC_ITERATE(op, program) {
+            opPrint(stdout, *op);
+            putchar('\n');
+        }
+    }
     if(opts.compile_to_c) {
         FILE *out = fopen("brainf.out.c", "w");
         assert(out);

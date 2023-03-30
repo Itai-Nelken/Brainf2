@@ -9,10 +9,11 @@ An optimizing brainfuck compiler and interpreter.
 ```
 Usage: ./brainf [options]
 Options:
-    [code]    execute code directly from the first argument.
-    -f [file] execute a file.
-    -c [file] compile a file to C code.
+    [code]    Execute code directly from the first argument.
+    -f [file] Execute a file.
+    -c [file] Compile a file to C code.
     -o        Optimize the program.
+    -d        Dump the compiled (and optimized if '-o' set) instructions.
 ```
 
 ## Compiling
