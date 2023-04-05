@@ -13,25 +13,26 @@ Compiler compilerNew(char *input) {
     };
 }
 
-bool compilerIsEnd(Compiler *c) {
-    return c->loc >= stringLength(c->input);
-}
-
-char compilerNext(Compiler *c) {
-    assert(!compilerIsEnd(c));
-    return c->input[c->loc++];
-}
-
 void compilerFree(Compiler *c) {
     stringFree(c->input);
     c->input = NULL;
     c->loc = 0;
 }
 
+static bool is_end(Compiler *c) {
+    return c->loc >= stringLength(c->input);
+}
+
+static char next(Compiler *c) {
+    assert(!is_end(c));
+    return c->input[c->loc++];
+}
+
+
 static Vec(Op) compile_internal(Compiler *c, bool in_loop) {
     Vec(Op) out = VEC_NEW(Op);
-    while(!compilerIsEnd(c)) {
-        switch(compilerNext(c)) {
+    while(!is_end(c)) {
+        switch(next(c)) {
             case '+':
                 VEC_PUSH(out, opNew(OP_INCREMENT));
                 break;

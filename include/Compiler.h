@@ -13,8 +13,6 @@ typedef struct compiler {
 } Compiler;
 
 Compiler compilerNew(char *input);
-bool compilerIsEnd(Compiler *c);
-char compilerNext(Compiler *c);
 void compilerFree(Compiler *c);
 Vec(Op) compile(Compiler *c);
 
