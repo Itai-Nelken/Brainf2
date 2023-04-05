@@ -91,7 +91,7 @@ Vec(Op) optimize(Vec(Op) prog) {
                 if(optimized_op.op.as.x > 2) {
                     struct optimized_op prev = VEC_POP(optimized_ops);
                     optimized_op.start = prev.start;
-                    optimized_op.end = opIteratorCurrentIdx(&iter);
+                    // optimized_op.end is already correctly set above.
                 }
                 VEC_PUSH(optimized_ops, optimized_op);
                 window[1] = &optimized_op.op;
